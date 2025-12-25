@@ -2,11 +2,17 @@
 package notepad;
 
 import com.sun.org.apache.xml.internal.serialize.Method;
+import java.awt.Component;
 import java.awt.Font;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.HashMap;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -15,9 +21,25 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
+import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
+
+
+
+class EditorTab
+{
+     File file;
+    JTextArea jt;
+
+    public EditorTab(JTextArea jt, File file) 
+    {
+        this.file=file;
+        this.jt=jt;
+    }
+    
+}
 
 
 public class Home implements ActionListener
@@ -27,8 +49,11 @@ public class Home implements ActionListener
     JMenu filee, edit, view, zoom;
     JMenuItem ntab, window, markdown, open, recent, save, saveas, saveall, pagesetup, print, closetab, closewindow, exit, zin, zout, zdef;
     JCheckBoxMenuItem wrap,  status;
-    JTextArea jt;
     JFileChooser fileChooser;
+    JTabbedPane tabs;
+    
+    HashMap<Component, EditorTab> tabMap = new HashMap<>();
+    
     
     public Home()
     {
@@ -133,16 +158,31 @@ public class Home implements ActionListener
         bar.add(view);
         
         
-        jt=new JTextArea();
-        jt.setFont(new Font("Consolas", Font.PLAIN, 16));
         
-        JScrollPane scroll=new JScrollPane(jt);
+        tabs=new JTabbedPane();
+        jf.add(tabs);
         
-        jf.add(scroll);
+        addNewTab(null);
+        
+        
         jf.setJMenuBar(bar);
         jf.setVisible(true);
     }
 
+    
+    public void addNewTab(File file)
+    {
+        JTextArea ja=new JTextArea();
+        ja.setFont(new Font("Consolas", Font.PLAIN, 16));
+        JScrollPane scroll=new JScrollPane(ja);
+        String title = (file == null) ? "Untitled" : file.getName();
+        
+        tabs.addTab(title, scroll);
+         
+        tabs.setSelectedComponent(scroll);
+        tabMap.put(scroll, new EditorTab(ja, file));
+    }
+    
     @Override
     public void actionPerformed(ActionEvent ae) {
         if(ae.getSource()==save)
@@ -159,7 +199,16 @@ public class Home implements ActionListener
             fileChooser = new JFileChooser();
             if(fileChooser.showSaveDialog(jf)==0)
             {
-                
+                File file=fileChooser.getSelectedFile();
+                try (FileOutputStream fos=new FileOutputStream(file);)
+                {
+                    fos.write(text.getBytes());
+                }
+                catch (IOException e)
+                {
+                    System.err.println("File save error: "+e);
+                }
+                 
             }
             else
             {
