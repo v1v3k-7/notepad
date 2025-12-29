@@ -11,8 +11,10 @@ import java.awt.event.KeyEvent;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
+import javax.swing.*;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -25,12 +27,15 @@ import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
 import javax.swing.KeyStroke;
 import javax.swing.UIManager;
+import javax.swing.event.CaretEvent;
+import javax.swing.event.CaretListener;
+import javax.swing.text.DefaultEditorKit;
 
 
 
 class EditorTab
 {
-     File file;
+    File file;
     JTextArea jt;
 
     public EditorTab(JTextArea jt, File file) 
@@ -42,12 +47,12 @@ class EditorTab
 }
 
 
-public class Home implements ActionListener
+public class Home implements ActionListener, CaretListener
 {
     JFrame jf;
     JMenuBar bar;
     JMenu filee, edit, view, zoom;
-    JMenuItem ntab, window, markdown, open, recent, save, saveas, saveall, pagesetup, print, closetab, closewindow, exit, zin, zout, zdef;
+    JMenuItem ntab, window, markdown, open, recent, save, saveas, saveall, pagesetup, print, closetab, closewindow, exit, zin, zout, zdef, cut, copy, paste;
     JCheckBoxMenuItem wrap,  status;
     JFileChooser fileChooser;
     JTabbedPane tabs;
@@ -154,12 +159,34 @@ public class Home implements ActionListener
         view.add(status);
         view.add(wrap);
         
+        
+        edit=new JMenu("Edit");
+        cut=new JMenuItem(new DefaultEditorKit.CutAction());
+        cut.setText("Cut");
+        cut.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_X, shortcut));
+//        cut.addActionListener(this);
+
+        copy=new JMenuItem(new DefaultEditorKit.CopyAction());
+        copy.setText("Copy");
+        copy.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_C, shortcut));
+        
+        paste=new JMenuItem("Paste");
+        paste.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_V, shortcut));
+        paste.addActionListener(this);
+        
+        edit.add(cut);
+        edit.add(paste);
+        edit.add(copy);
+        
+        
         bar.add(filee);
+        bar.add(edit);
         bar.add(view);
         
         
         
         tabs=new JTabbedPane();
+        tabs.addChangeListener(e -> {updateCutCopy();});
         jf.add(tabs);
         
         addNewTab(null);
@@ -173,6 +200,9 @@ public class Home implements ActionListener
     public void addNewTab(File file)
     {
         JTextArea ja=new JTextArea();
+        ja.addCaretListener(this);
+        cut.setEnabled(false);
+        copy.setEnabled(false);
         ja.setFont(new Font("Consolas", Font.PLAIN, 16));
         JScrollPane scroll=new JScrollPane(ja);
         String title = (file == null) ? "Untitled" : file.getName();
@@ -183,17 +213,28 @@ public class Home implements ActionListener
         tabMap.put(scroll, new EditorTab(ja, file));
     }
     
-    @Override
+    
+    @Override 
     public void actionPerformed(ActionEvent ae) {
         if(ae.getSource()==save)
         {
-            save();
+            saveAs();
+        }
+        if(ae.getSource()==open)
+        {
+            open();
+        }
+        if(ae.getSource()==ntab)
+        {
+            addNewTab(null);
         }
     }
     
-    public void save()
+    
+    public void saveAs()
     {
-        String text=jt.getText();
+        EditorTab ed=tabMap.get(tabs.getSelectedComponent());
+        String text=ed.jt.getText();
         if(!text.isEmpty())
         {
             fileChooser = new JFileChooser();
@@ -203,6 +244,9 @@ public class Home implements ActionListener
                 try (FileOutputStream fos=new FileOutputStream(file);)
                 {
                     fos.write(text.getBytes());
+                    ed.file=file;
+                    int index=tabs.getSelectedIndex();
+                    tabs.setTitleAt(index, file.getName());
                 }
                 catch (IOException e)
                 {
@@ -215,5 +259,51 @@ public class Home implements ActionListener
                 JOptionPane.showMessageDialog(jf, "File not saved!", "File Not Saved", JOptionPane.WARNING_MESSAGE);
             }
         }
+    }
+    public void open()
+    {
+        fileChooser = new JFileChooser();
+        if(fileChooser.showSaveDialog(jf)==0)
+        {
+            File file=fileChooser.getSelectedFile();
+            try(FileReader fr=new FileReader(file))
+            {
+                EditorTab ed=tabMap.get(tabs.getSelectedComponent());
+                ed.file=file;
+                ed.jt.read(fr, null);
+                tabs.setTitleAt(tabs.getSelectedIndex(), file.getName());
+            }
+            catch(IOException e)
+            {
+                System.err.println("File open error: "+e);
+            }
+        }
+        else
+        {
+            JOptionPane.showMessageDialog(jf, "File not opened!", "Operation Cancelled", JOptionPane.WARNING_MESSAGE);
+        }
+        
+    }
+
+    
+    void updateCutCopy()
+    {
+        EditorTab ed=tabMap.get(tabs.getSelectedComponent());
+        if(ed==null)
+        {
+        }
+        else
+        {
+            JTextArea ja=ed.jt;
+            boolean hasSelected= ja.getSelectionStart() != ja.getSelectionEnd();
+            cut.setEnabled(hasSelected);
+            copy.setEnabled(hasSelected);  
+        }
+        
+    }
+  
+    
+    public void caretUpdate(CaretEvent ce) {
+        updateCutCopy();
     }
 }
